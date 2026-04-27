@@ -1,0 +1,161 @@
+// ==========================================
+// UBIKE 雷達 - Google Apps Script 後端 (動態金鑰版)
+// ==========================================
+
+// 處理 POST 請求
+function doPost(e) {
+  try {
+    // 解析前端傳來的 JSON 資料 (為避免 CORS Preflight，前端應使用 text/plain 發送 JSON 字串)
+    if (!e.postData || !e.postData.contents) {
+      throw new Error("No data received.");
+    }
+    
+    const requestData = JSON.parse(e.postData.contents);
+    const clientId = requestData.clientId;
+    const clientSecret = requestData.clientSecret;
+    const lat = requestData.lat;
+    const lng = requestData.lng;
+    
+    // 檢查參數
+    if (!clientId || !clientSecret) {
+       throw new Error("Missing TDX API Credentials (Client ID or Client Secret).");
+    }
+    if (!lat || !lng) {
+       throw new Error("Missing 'lat' or 'lng' parameters.");
+    }
+
+    // 呼叫主函式 (搜尋半徑 1000m)
+    const data = getYouBikeDataNearBy(lat, lng, 1000, clientId, clientSecret);
+    
+    return ContentService.createTextOutput(JSON.stringify(data))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (error) {
+    const errorResponse = {
+      status: 'error',
+      message: error.toString()
+    };
+    return ContentService.createTextOutput(JSON.stringify(errorResponse))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// 支援 GET 請求，方便使用者測試部署是否成功
+function doGet(e) {
+  return ContentService.createTextOutput("UBIKE Radar API Proxy is running. Please use POST method to fetch data.")
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
+// ==========================================
+// 核心邏輯：取得附近 1km 資料
+// ==========================================
+function getYouBikeDataNearBy(lat, lng, radius, clientId, clientSecret) {
+  const token = getAccessToken(clientId, clientSecret);
+  
+  // 1. 取得附近站點靜態資料 (位置、名稱)
+  const stationUrl = `https://tdx.transportdata.tw/api/advanced/v2/Bike/Station/NearBy?%24top=30&%24spatialFilter=nearby(${lat},${lng},${radius})&%24format=JSON`;
+  const stationData = fetchTdxData(stationUrl, token);
+  
+  // 2. 取得附近即時車位資料
+  const availUrl = `https://tdx.transportdata.tw/api/advanced/v2/Bike/Availability/NearBy?%24top=30&%24spatialFilter=nearby(${lat},${lng},${radius})&%24format=JSON`;
+  const availData = fetchTdxData(availUrl, token);
+  
+  // 3. 建立即時資料的索引 (Map)
+  const availMap = new Map();
+  availData.forEach(item => {
+    availMap.set(item.StationUID, item);
+  });
+  
+  // 4. 合併資料
+  const mergedData = stationData
+    .filter(station => station.ServiceType === 2) // 確保是 YouBike 2.0
+    .map(station => {
+      const avail = availMap.get(station.StationUID);
+      
+      let generalBikes = 0;
+      let electricBikes = 0;
+      
+      if (avail && avail.AvailableRentBikesDetail) {
+         generalBikes = avail.AvailableRentBikesDetail.General || avail.AvailableRentBikesDetail.GeneralBikes || 0;
+         electricBikes = avail.AvailableRentBikesDetail.Electric || avail.AvailableRentBikesDetail.ElectricBikes || 0;
+      }
+      
+      if (generalBikes === 0 && electricBikes === 0 && avail && avail.AvailableRentBikes > 0) {
+        generalBikes = avail.AvailableRentBikes;
+      } else if (!avail) {
+         generalBikes = 0;
+      }
+      
+      let totalSpaces = 0;
+      if (avail) {
+          totalSpaces = avail.TotalSpaces || (avail.AvailableRentBikes + avail.AvailableReturnBikes) || 0;
+      }
+
+      return {
+        uid: station.StationUID,
+        name: station.StationName.Zh_tw,
+        lat: station.StationPosition.PositionLat,
+        lng: station.StationPosition.PositionLon,
+        total: totalSpaces,
+        available: avail ? avail.AvailableRentBikes : 0,
+        available_general: generalBikes,
+        available_electric: electricBikes,
+        updateTime: avail ? avail.UpdateTime : ''
+      };
+    });
+    
+  return {
+    status: 'success',
+    data: mergedData,
+    count: mergedData.length,
+    source: 'TDX API NearBy'
+  };
+}
+
+// ==========================================
+// 工具函式
+// ==========================================
+function fetchTdxData(url, token) {
+  const options = {
+    method: 'GET',
+    headers: { 'authorization': `Bearer ${token}` },
+    muteHttpExceptions: true
+  };
+  const response = UrlFetchApp.fetch(url, options);
+  if (response.getResponseCode() !== 200) {
+    throw new Error(`TDX API Fetch Error: ${response.getResponseCode()} - ${response.getContentText()}`);
+  }
+  return JSON.parse(response.getContentText());
+}
+
+function getAccessToken(clientId, clientSecret) {
+  const cache = CacheService.getScriptCache();
+  // 根據 clientId 產生獨立的 cache key，避免不同使用者互相干擾
+  const cacheKey = 'tdx_token_' + clientId;
+  const cachedToken = cache.get(cacheKey);
+  
+  if (cachedToken) return cachedToken;
+  
+  const authUrl = 'https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token';
+  const payload = {
+    'grant_type': 'client_credentials',
+    'client_id': clientId,
+    'client_secret': clientSecret
+  };
+  
+  const response = UrlFetchApp.fetch(authUrl, {
+    method: 'POST',
+    payload: payload,
+    muteHttpExceptions: true
+  });
+  
+  const json = JSON.parse(response.getContentText());
+  if (json.access_token) {
+    // TDX Token 預設有效期限為 86400 秒 (24小時)，這裡我們快取 20000 秒
+    cache.put(cacheKey, json.access_token, 20000);
+    return json.access_token;
+  }
+  
+  // 若取得失敗，拋出詳細錯誤
+  throw new Error(`Failed to get Access Token. Check your Client ID and Secret. Response: ${response.getContentText()}`);
+}

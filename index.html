@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UBike 雷達</title>
+
+    <!-- Leaflet & Icons -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Poppins:wght@400;600;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Poppins', 'Noto Sans TC', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            start: '#F59E0B', // Amber 500
+                            end: '#EA580C',   // Orange 600
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body,
+        html {
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* 絢麗背景漸層 */
+        .vibrant-bg {
+            background: linear-gradient(135deg, #FFF7ED 0%, #FEF3C7 100%);
+        }
+
+        /* 玻璃擬態 */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        /* 卡片樣式 */
+        .station-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(243, 244, 246, 0.8);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 卡片懸浮效果: 上浮 + 陰影加深 + 邊框發光 */
+        .station-card:hover {
+            transform: translateY(-2px) scale(1.01);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            border-color: #FCD34D;
+        }
+
+        /* 列表進場動畫 */
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-entry {
+            animation: slideInUp 0.5s ease-out forwards;
+            opacity: 0;
+            /* 預設隱藏，由動畫顯示 */
+        }
+
+        /* 滾動條美化 */
+        #list-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #list-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #list-container::-webkit-scrollbar-thumb {
+            background-color: #CBD5E1;
+            border-radius: 20px;
+        }
+
+        /* 地圖標記優化 */
+        .number-marker {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: 800;
+            font-size: 15px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            /* 更深的陰影 */
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            /* 彈性效果 */
+        }
+
+        .number-marker:hover {
+            transform: scale(1.25);
+            z-index: 999 !important;
+        }
+
+        /* User Marker - 紅色光暈 */
+        .user-marker {
+            background: #ef4444;
+            border: 3px solid white;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            animation: pulse-red 2s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
+            }
+
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        .custom-div-icon {
+            background: transparent !important;
+            border: none !important;
+        }
+
+        /* Loader */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #F59E0B;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Mobile / Desktop Layout is now handled by Tailwind utility classes in HTML */
+    </style>
+</head>
+
+<body class="flex flex-col h-screen vibrant-bg">
+
+    <!-- Navbar: 高度 h-14, padding p-2 -->
+    <nav
+        class="shrink-0 bg-gradient-to-r from-brand-start to-brand-end text-white p-2 shadow-lg h-14 flex justify-between items-center px-3 z-50 relative">
+        <div class="font-bold text-lg md:text-xl tracking-wide flex items-center drop-shadow-md">
+            <!-- ICON -->
+            <div class="bg-white/20 p-1.5 rounded-full mr-2 backdrop-blur-sm">
+                <i class="fa-solid fa-bicycle text-white text-base"></i>
+            </div>
+            <!-- 手機版: 只有 Icon，沒有文字 -->
+            <span class="hidden md:inline">轉角遇到車</span>
+            <span
+                class="hidden md:inline text-xs ml-2 opacity-90 font-normal bg-white/20 px-2 py-0.5 rounded-full">有Bike有保庇</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- 倒數計時器: 極簡化 -->
+            <div
+                class="bg-black/20 text-white px-2 py-0.5 rounded-full text-[10px] md:text-xs font-mono backdrop-blur-sm border border-white/10 flex items-center">
+                <i class="fa-regular fa-clock mr-1 opacity-70"></i>
+                <span id="countdown">30</span>s
+            </div>
+
+            <!-- 手動定位按鈕 -->
+            <button onclick="reCenterMap()" title="回到我的位置"
+                class="bg-white/10 border border-white/30 text-white w-8 h-8 rounded-full shadow-sm hover:bg-white/20 active:scale-95 transition-all flex justify-center items-center backdrop-blur-md">
+                <i class="fa-solid fa-location-crosshairs text-xs"></i>
+            </button>
+
+            <!-- 重整按鈕: 手機版只剩 Icon -->
+            <button onclick="manualRefresh()"
+                class="bg-white/10 border border-white/30 text-white w-8 h-8 md:w-auto md:px-3 md:py-1 rounded-full text-xs font-bold shadow-sm hover:bg-white/20 active:scale-95 transition-all flex justify-center items-center backdrop-blur-md">
+                <i class="fa-solid fa-rotate md:mr-2 text-xs"></i>
+                <span class="hidden md:inline">重整</span>
+            </button>
+
+            <!-- API 設定按鈕 -->
+            <button onclick="openSettings()" title="API 設定"
+                class="bg-white/10 border border-white/30 text-white w-8 h-8 rounded-full shadow-sm hover:bg-white/20 active:scale-95 transition-all flex justify-center items-center backdrop-blur-md">
+                <i class="fa-solid fa-gear text-xs"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay"
+        class="absolute inset-0 z-[3000] bg-white/90 backdrop-blur-md flex flex-col justify-center items-center">
+        <div class="loader mb-6 shadow-orange-500/50 drop-shadow-lg"></div>
+        <div id="loading-text" class="text-slate-700 font-bold text-lg md:text-xl tracking-widest animate-pulse">
+            正在搜尋您的位置...</div>
+        <div class="text-slate-400 text-xs md:text-sm mt-2">請保持 GPS 開啟以獲得最佳體驗</div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main-layout" class="flex flex-col md:flex-row flex-1 relative overflow-hidden">
+
+        <!-- Map Wrapper: 負責佔位與定位 -->
+        <div id="map-wrapper" class="relative w-full h-[55vh] md:h-full md:w-[60%] shadow-inner z-10">
+            <!-- Leaflet Map: 純粹的地圖容器 -->
+            <div id="map" class="w-full h-full"></div>
+
+            <!-- Error Toast: 懸浮在地圖上層 -->
+            <div id="error-msg"
+                class="hidden absolute top-6 left-1/2 transform -translate-x-1/2 z-[2000] bg-red-500 text-white px-5 py-3 rounded-2xl shadow-2xl flex flex-col items-center justify-center animate-bounce transition-all">
+                <div class="flex items-center gap-2 mb-2">
+                    <i class="fa-solid fa-circle-exclamation text-lg"></i>
+                    <span id="error-text" class="font-bold text-sm md:text-base whitespace-nowrap"></span>
+                </div>
+                <!-- Retry Button will be appended here via JS -->
+            </div>
+        </div>
+
+        <div id="list-container"
+            class="flex flex-col bg-slate-50 relative w-full h-[45vh] md:h-full md:w-[40%] z-20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.1)]">
+            <!-- 列表標題: Mobile 極簡化 -->
+            <div class="p-2 md:p-3 glass-panel sticky top-0 z-30 flex-shrink-0">
+                <h2 class="font-bold text-slate-800 text-base md:text-lg flex justify-between items-center">
+                    <span class="flex items-center">
+                        <i
+                            class="fa-solid fa-location-dot text-brand-end mr-1.5 text-base md:text-lg animate-bounce"></i>
+                        <span class="md:hidden">附近站點</span>
+                        <span class="hidden md:inline">底加啦！附近有車</span>
+                    </span>
+                    <span
+                        class="text-[10px] md:text-xs font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                        範圍 1.5 km
+                    </span>
+                </h2>
+            </div>
+
+            <!-- 列表內容區 -->
+            <div id="station-list" class="p-2 md:p-4 space-y-2 md:space-y-3 flex-1 overflow-y-auto pb-24">
+                <!-- Javascript Rendered Items -->
+            </div>
+
+            <div
+                class="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-slate-50 to-transparent pointer-events-none z-20">
+            </div>
+        </div>
+    </div>
+
+    <!-- 浮動搜尋按鈕 (預設隱藏) -->
+    <div id="search-here-btn" onclick="searchCurrentArea()"
+        class="hidden absolute top-20 left-1/2 transform -translate-x-1/2 z-[1000] cursor-pointer group">
+        <div
+            class="bg-white text-slate-700 px-4 py-2 rounded-full shadow-lg border border-slate-200 font-bold text-sm flex items-center gap-2 group-hover:bg-brand-start group-hover:text-white transition-all">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            搜尋此區域
+        </div>
+    </div>
+
+    <!-- 返回定位按鈕 (取代原本的 Manual Center，或者作為搜尋後的提示) -->
+    <div id="back-to-gps-btn" onclick="returnToGPS()"
+        class="hidden absolute bottom-8 left-1/2 transform -translate-x-1/2 z-[1000] cursor-pointer">
+        <div
+            class="bg-slate-800/90 backdrop-blur text-white px-5 py-2.5 rounded-full shadow-xl font-bold text-sm flex items-center gap-2 hover:scale-105 transition-all animate-bounce">
+            <i class="fa-solid fa-location-arrow"></i>
+            返回我的位置
+        </div>
+    </div>
+
+    <!-- API 設定 Modal -->
+    <div id="settings-modal"
+        class="hidden fixed inset-0 z-[4000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-entry">
+            <div class="bg-slate-800 text-white p-4 flex justify-between items-center">
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-key mr-2 text-brand-start"></i>TDX API 設定</h3>
+                <button onclick="closeSettings()" class="text-slate-300 hover:text-white transition"><i
+                        class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-sm text-slate-500 mb-2">請輸入您的 TDX Client ID 與 Client Secret
+                    以啟用查詢功能。此資訊將只儲存於您的瀏覽器中，不會上傳至其他伺服器。</p>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Client ID</label>
+                    <input type="text" id="api-client-id"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-start focus:border-brand-start outline-none transition"
+                        placeholder="例如: begin-34e051f5-6c71-4b47">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Client Secret</label>
+                    <input type="password" id="api-client-secret"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-start focus:border-brand-start outline-none transition"
+                        placeholder="您的 Client Secret">
+                </div>
+            </div>
+            <div class="bg-slate-50 p-4 flex justify-between items-center border-t border-slate-100">
+                <button onclick="clearSettings()"
+                    class="text-red-500 hover:text-red-700 text-sm font-bold px-3 py-2 rounded transition hover:bg-red-50">
+                    <i class="fa-solid fa-trash-can mr-1"></i>清除紀錄
+                </button>
+                <div class="flex gap-2">
+                    <button onclick="closeSettings()"
+                        class="px-4 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-lg transition">取消</button>
+                    <button onclick="saveSettings()"
+                        class="px-4 py-2 bg-brand-start hover:bg-brand-end text-white font-bold rounded-lg shadow transition">儲存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyeeNUpeR9odBok-7I-Ecft6oa5XRaEubzZwVhaOS3zUfMlyb1cXUN4JgrzyQawEkBH/exec';
+
+        const markerColors = [
+            '#EF4444', '#F97316', '#F59E0B', '#84CC16', '#10B981',
+            '#06B6D4', '#0ea5e9', '#3B82F6', '#6366F1', '#8B5CF6'
+        ];
+
+        let map, userMarker;
+        let stationMarkers = [];
+        let userLat, userLng;
+
+        // 狀態管理
+        let isRemoteMode = false; // 是否正在查看其他區域
+        let currentSearchLat, currentSearchLng; // 目前搜尋的中心點
+
+        let refreshTimer = null;
+        let countdownTimer = null;
+        let secondsLeft = 60; // 改為 60 秒
+        let watchId = null;
+
+        // 從 localStorage 讀取 API 密鑰
+        let apiClientId = localStorage.getItem('tdx_client_id') || '';
+        let apiClientSecret = localStorage.getItem('tdx_client_secret') || '';
+
+        // API 設定相關函數
+        function openSettings() {
+            document.getElementById('api-client-id').value = apiClientId;
+            document.getElementById('api-client-secret').value = apiClientSecret;
+            document.getElementById('settings-modal').classList.remove('hidden');
+        }
+
+        function closeSettings() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        }
+
+        function saveSettings() {
+            const newClientId = document.getElementById('api-client-id').value.trim();
+            const newClientSecret = document.getElementById('api-client-secret').value.trim();
+
+            if (!newClientId || !newClientSecret) {
+                alert("請完整輸入 Client ID 與 Client Secret");
+                return;
+            }
+
+            apiClientId = newClientId;
+            apiClientSecret = newClientSecret;
+            localStorage.setItem('tdx_client_id', apiClientId);
+            localStorage.setItem('tdx_client_secret', apiClientSecret);
+            closeSettings();
+
+            // 重新載入資料
+            if (userLat && userLng) {
+                document.getElementById('loading-overlay').classList.remove('hidden');
+                document.getElementById('loading-text').innerText = "套用新設定並讀取資料中...";
+                fetchNearbyData();
+            } else {
+                startTrackingUser();
+            }
+        }
+
+        function clearSettings() {
+            if (confirm("確定要清除儲存在瀏覽器的 API 密鑰嗎？")) {
+                localStorage.removeItem('tdx_client_id');
+                localStorage.removeItem('tdx_client_secret');
+                apiClientId = '';
+                apiClientSecret = '';
+                document.getElementById('api-client-id').value = '';
+                document.getElementById('api-client-secret').value = '';
+                alert("已清除密鑰，請重新設定。");
+            }
+        }
+
+        window.onload = function () {
+            startTrackingUser();
+        };
+
+        let locationTimer = null; // 全域變數：定位計時器
+
+        function startTrackingUser() {
+            const loadingText = document.getElementById('loading-text');
+            const errorMsg = document.getElementById('error-msg');
+
+            errorMsg.classList.add('hidden');
+
+            if (!navigator.geolocation) {
+                showError("您的瀏覽器不支援定位功能");
+                loadDefaultMap();
+                return;
+            }
+
+            loadingText.innerText = "正在搜尋您的位置 (精準模式)...";
+
+            // ★ 強制安全機制：22秒後如果不回應 (比定位的20秒稍長)，直接切換預設地圖
+            if (locationTimer) clearTimeout(locationTimer);
+            locationTimer = setTimeout(() => {
+                console.warn("定位回應逾時 (Global Timeout)");
+                handleLocationError({ code: 3, message: "定位回應逾時" });
+            }, 22000);
+
+            // 策略：只嘗試一次精準定位 (20秒)
+            // 失敗 -> 顯示錯誤並切換預設地圖
+            // 成功 -> 初始化地圖並開始持續追蹤 (watchPosition)
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    handleFirstLocation(position);
+                },
+                (error) => {
+                    console.error("精準定位失敗", error);
+                    handleLocationError(error);
+                },
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+            );
+        }
+
+        // 處理第一次定位成功
+        function handleFirstLocation(position) {
+            // 清除逾時倒數
+            if (locationTimer) clearTimeout(locationTimer);
+
+            const loadingText = document.getElementById('loading-text');
+            loadingText.innerText = "定位成功！鎖定中...";
+
+            userLat = position.coords.latitude;
+            userLng = position.coords.longitude;
+
+            initMap();
+            fetchNearbyData(userLat, userLng);
+            startAutoRefresh();
+
+            // ★ 修正：隱藏 Loading 遮罩
+            document.getElementById('loading-overlay').classList.add('hidden');
+
+            // 成功後，開啟持續追蹤
+            startWatching();
+        }
+
+        // 持續追蹤位置
+        function startWatching() {
+            const options = { enableHighAccuracy: true, timeout: 30000, maximumAge: 10000 };
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    userLat = position.coords.latitude;
+                    userLng = position.coords.longitude;
+                    updateUserMarker();
+                },
+                (error) => { console.error("持續追蹤失敗:", error); }, // 追蹤失敗不需跳 Alert，因為地圖已經出來了
+                options
+            );
+        }
+
+        function handleLocationError(error) {
+            // 清除逾時倒數
+            if (locationTimer) clearTimeout(locationTimer);
+
+            let msg = "無法取得位置";
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    msg = "定位權限被拒絕";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    msg = "無法偵測到位置 (訊號不佳)";
+                    break;
+                case 3: // Timeout (Manual code 3 reflects timeout)
+                case error.TIMEOUT:
+                    msg = "定位請求逾時";
+                    break;
+            }
+            showError(msg + "，已切換至預設地圖");
+            loadDefaultMap(); // ★ 關鍵：失敗時直接載入預設地圖
+        }
+
+        // 用於定位失敗時，至少讓使用者可以用地圖
+        function loadDefaultMap() {
+            const loading = document.getElementById('loading-overlay');
+            loading.classList.add('hidden');
+
+            // 預設座標：台南火車站 (因為使用者剛才提到台南)
+            // 如果還沒初始化地圖，就初始化
+            if (!map) {
+                // 假裝在台南，方便使用者測試
+                userLat = 22.9971;
+                userLng = 120.2126;
+                initMap();
+                // 進入遠端模式，這樣使用者移動地圖不會怪怪的
+                isRemoteMode = true;
+                fetchNearbyData(userLat, userLng);
+                // 移除 Alert，改由外部 showError 顯示提示即可，體驗較順暢
+            }
+        }
+
+        function showError(msg) {
+            const errorMsg = document.getElementById('error-msg');
+            const errorText = document.getElementById('error-text');
+
+            errorText.innerText = msg;
+            errorMsg.classList.remove('hidden');
+
+            if (!document.getElementById('retry-btn')) {
+                const retryBtn = document.createElement('button');
+                retryBtn.id = 'retry-btn';
+                // 調整樣式: 去掉 ml-3, 增加寬度或 padding
+                retryBtn.className = "bg-white text-red-500 text-xs md:text-sm font-bold px-4 py-1.5 rounded-full shadow hover:bg-slate-100 transition w-auto";
+                retryBtn.innerText = "重試定位";
+                retryBtn.onclick = () => {
+                    location.reload(); // 簡單暴力，直接重整網頁最乾淨
+                };
+                errorMsg.appendChild(retryBtn);
+            }
+        }
+
+        function initMap() {
+            if (!map) {
+                map = L.map('map', { zoomControl: false }).setView([userLat, userLng], 15);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OSM'
+                }).addTo(map);
+                L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+                // 監聽拖曳事件 -> 顯示「搜尋此區域」
+                map.on('moveend', () => {
+                    // 只有當中心點距離「目前搜尋點」超過一定距離，才顯示按鈕
+                    // 簡單做：只要移動就顯示，除非正在自動飛
+                    const center = map.getCenter();
+                    const distUser = getDistance(userLat, userLng, center.lat, center.lng);
+
+                    // 如果距離使用者超過 500m，且不是正在 Remote Mode (或者想換地方搜)
+                    if (distUser > 0.5) {
+                        document.getElementById('search-here-btn').classList.remove('hidden');
+                    } else {
+                        // 離家很近，就不顯示搜尋鈕，自動當作是看家附近
+                        document.getElementById('search-here-btn').classList.add('hidden');
+                        if (isRemoteMode) returnToGPS(); // 自動歸位 (可選)
+                    }
+                });
+
+            } else {
+                map.setView([userLat, userLng], 15);
+            }
+            updateUserMarker();
+        }
+
+        function updateUserMarker() {
+            if (!map) return;
+            if (userMarker) map.removeLayer(userMarker);
+
+            const userIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div class="user-marker"></div>`,
+                iconSize: [22, 22],
+                iconAnchor: [11, 11]
+            });
+
+            userMarker = L.marker([userLat, userLng], { icon: userIcon, zIndexOffset: 50 }).addTo(map);
+        }
+
+        // 搜尋目前地圖中心
+        function searchCurrentArea() {
+            const center = map.getCenter();
+            isRemoteMode = true;
+            currentSearchLat = center.lat;
+            currentSearchLng = center.lng;
+
+            fetchNearbyData(currentSearchLat, currentSearchLng);
+
+            // UI 更新
+            document.getElementById('search-here-btn').classList.add('hidden');
+            document.getElementById('back-to-gps-btn').classList.remove('hidden');
+        }
+
+        // 返回 GPS 模式
+        function returnToGPS() {
+            isRemoteMode = false;
+            map.flyTo([userLat, userLng], 15);
+            fetchNearbyData(userLat, userLng);
+
+            document.getElementById('back-to-gps-btn').classList.add('hidden');
+            document.getElementById('search-here-btn').classList.add('hidden');
+        }
+
+        // 手動回到定位點 (Navbar 按鈕用)
+        function reCenterMap() {
+            if (map && userLat && userLng) {
+                returnToGPS(); // 直接復用邏輯
+            } else {
+                alert("尚未取得定位資訊");
+            }
+        }
+
+        // 核心查詢函式
+        async function fetchNearbyData(lat, lng) {
+            // 安全檢查：是否有設定 API Key
+            if (!apiClientId || !apiClientSecret) {
+                showError("請先設定 TDX API 密鑰");
+                openSettings();
+                document.getElementById('loading-overlay').classList.add('hidden');
+                return;
+            }
+
+            try {
+                // 如果沒傳參數，依據模式決定查哪裡
+                if (!lat || !lng) {
+                    if (isRemoteMode) {
+                        lat = currentSearchLat;
+                        lng = currentSearchLng;
+                    } else {
+                        lat = userLat;
+                        lng = userLng;
+                    }
+                }
+
+                if (!lat || !lng) return;
+
+                // 改用 POST 請求，將密鑰放在 Request Body 中
+                const requestOptions = {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' }, // 使用 text/plain 避免 GAS CORS Preflight 錯誤
+                    body: JSON.stringify({
+                        clientId: apiClientId,
+                        clientSecret: apiClientSecret,
+                        lat: lat,
+                        lng: lng
+                    })
+                };
+
+                const url = `${GAS_API_URL}`;
+                const response = await fetch(url, requestOptions);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const json = await response.json();
+
+                if (json.status === 'success') {
+                    // 計算離「地圖中心/搜尋點」的距離
+                    const centerLat = lat;
+                    const centerLng = lng;
+
+                    const allStations = json.data.map(s => {
+                        s.distance = getDistance(centerLat, centerLng, s.lat, s.lng);
+                        return s;
+                    });
+
+                    const availableStations = allStations
+                        .sort((a, b) => a.distance - b.distance)
+                        .filter(s => s.available > 0);
+
+                    const top10 = availableStations.slice(0, 10);
+
+                    renderMap(top10);
+                    renderList(top10);
+
+                    document.getElementById('loading-overlay').classList.add('hidden');
+                    // 清除可能因為之前沒設定密鑰而殘留的錯誤訊息
+                    document.getElementById('error-msg').classList.add('hidden');
+                    resetCountdown();
+                } else {
+                    throw new Error(json.message || "伺服器發生未知錯誤");
+                }
+            } catch (e) {
+                console.error(e);
+                showError("資料載入失敗: " + e.message);
+                if (!document.getElementById('loading-overlay').classList.contains('hidden')) {
+                    document.getElementById('loading-overlay').classList.add('hidden');
+                }
+            }
+        }
+
+        function renderMap(stations) {
+            stationMarkers.forEach(m => map.removeLayer(m));
+            stationMarkers = [];
+
+            stations.forEach((s, index) => {
+                const color = markerColors[index % markerColors.length];
+                const labelContent = s.available;
+
+                const icon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div class="number-marker" style="background-color: ${color}; width: 36px; height: 36px;">${labelContent}</div>`,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18]
+                });
+
+                const marker = L.marker([s.lat, s.lng], { icon: icon, zIndexOffset: 1000 - index })
+                    .addTo(map);
+
+                marker.on('click', () => { map.flyTo([s.lat, s.lng], 16.5); });
+                stationMarkers.push(marker);
+            });
+        }
+
+        function renderList(stations) {
+            const container = document.getElementById('station-list');
+            container.innerHTML = '';
+
+            if (stations.length === 0) {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center mt-10 text-center opacity-60">
+                        <i class="fa-solid fa-map-location-dot text-4xl md:text-6xl text-slate-300 mb-4"></i>
+                        <p class="text-slate-500 font-medium text-sm">附近的 YouBike 都在睡覺zzz</p>
+                    </div>`;
+                return;
+            }
+
+            stations.forEach((s, index) => {
+                const color = markerColors[index % markerColors.length];
+                const num = index + 1;
+                const cleanName = s.name.replace(/YouBike2\.0_/g, '');
+                const delay = index * 0.05;
+
+                const item = document.createElement('div');
+                // 極致壓縮: p-2.5
+                item.className = "station-card flex items-center p-2.5 md:p-4 cursor-pointer animate-entry bg-white rounded-xl shadow-sm border border-slate-100";
+                item.style.animationDelay = `${delay}s`;
+
+                item.innerHTML = `
+                    <!-- 編號: w-6 text-base -->
+                    <div class="flex-shrink-0 w-6 md:w-8 text-center font-extrabold text-slate-300 text-base md:text-xl font-mono mr-2">
+                        ${num}.
+                    </div>
+                    
+                    <div class="flex-1 min-w-0">
+                        <!-- 站名: text-[13px] leading-tight -->
+                        <div class="mb-1">
+                            <h3 class="font-bold text-slate-800 text-[13px] md:text-[15px] truncate leading-snug">${cleanName}</h3>
+                        </div>
+                        
+                        <div class="flex items-center gap-2 text-[11px] md:text-xs font-medium">
+                            <div class="flex items-center text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded">
+                                <i class="fa-solid fa-person-walking mr-1 text-slate-400"></i>${Math.round(s.distance * 1000)}m
+                            </div>
+                            <div class="flex gap-1">
+                                <span class="bg-yellow-50 text-yellow-700 px-1.5 py-0.5 rounded border border-yellow-100 flex items-center">
+                                    <i class="fa-solid fa-bolt mr-1 text-[9px]"></i>${s.available_electric}
+                                </span>
+                                <span class="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-100 flex items-center">
+                                    <i class="fa-solid fa-bicycle mr-1 text-[9px]"></i>${s.available_general}
+                                </span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 font-normal ml-auto">
+                                更新於 ${formatTime(s.updateTime)}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 泡泡: w-9 h-9 -->
+                    <div class="flex-shrink-0 ml-2 md:ml-3 text-right">
+                        <div class="w-9 h-9 md:w-11 md:h-11 rounded-full flex flex-col justify-center items-center text-white shadow-md transform transition group-hover:scale-110" 
+                             style="background: linear-gradient(135deg, ${color}, ${adjustColor(color, -20)})">
+                             <span class="text-sm md:text-lg font-bold leading-none mt-0.5">${s.available}</span>
+                             <span class="text-[8px] md:text-[9px] opacity-80 font-normal leading-none mb-0.5">可借</span>
+                        </div>
+                    </div>
+                `;
+
+                item.onclick = () => {
+                    map.flyTo([s.lat, s.lng], 17);
+                };
+
+                container.appendChild(item);
+            });
+        }
+
+        function startAutoRefresh() {
+            if (refreshTimer) clearInterval(refreshTimer);
+            if (countdownTimer) clearInterval(countdownTimer);
+
+            // 每 60 秒抓一次
+            refreshTimer = setInterval(() => {
+                // ★ 60秒到，如果不是手動搜尋異地，就自動飛回目前 GPS 位置
+                if (!isRemoteMode && userLat && userLng) {
+                    map.flyTo([userLat, userLng], 15);
+                    fetchNearbyData(userLat, userLng);
+                } else {
+                    fetchNearbyData();
+                }
+            }, 60000);
+            resetCountdown();
+            countdownTimer = setInterval(() => {
+                secondsLeft--;
+                if (secondsLeft < 0) secondsLeft = 60;
+                document.getElementById('countdown').innerText = secondsLeft;
+            }, 1000);
+        }
+
+        function resetCountdown() {
+            secondsLeft = 60; // 配合設定
+            document.getElementById('countdown').innerText = "60";
+        }
+
+        function manualRefresh() {
+            fetchNearbyData(); // 會自動判斷 isRemoteMode
+            resetCountdown();
+        }
+
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        function adjustColor(color, amount) {
+            return '#' + color.replace(/^#/, '').replace(/../g, color => ('0' + Math.min(255, Math.max(0, parseInt(color, 16) + amount)).toString(16)).substr(-2));
+        }
+
+        function formatTime(isoString) {
+            if (!isoString) return "--:--";
+            const date = new Date(isoString);
+            const hours = date.getHours().toString().padStart(2, '0');
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            return `${hours}:${minutes}`;
+        }
+    </script>
+</body>
+
+</html>
