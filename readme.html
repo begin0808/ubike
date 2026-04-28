@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>轉角遇到 U Bike - 使用者說明手冊</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Poppins', 'Noto Sans TC', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            start: '#F59E0B',
+                            end: '#EA580C',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f8fafc;
+        }
+        .markdown-body h2 {
+            @apply text-2xl font-bold text-slate-800 mt-8 mb-4 pb-2 border-b-2 border-brand-start/30 flex items-center;
+        }
+        .markdown-body h3 {
+            @apply text-xl font-bold text-slate-700 mt-6 mb-3;
+        }
+        .markdown-body p {
+            @apply text-slate-600 leading-relaxed mb-4;
+        }
+        .markdown-body ul, .markdown-body ol {
+            @apply pl-6 mb-4 text-slate-600 space-y-2;
+        }
+        .markdown-body li {
+            @apply leading-relaxed;
+        }
+        .markdown-body a {
+            @apply text-brand-end hover:text-brand-start underline font-medium transition-colors;
+        }
+        .markdown-body strong {
+            @apply text-slate-800 font-bold;
+        }
+        .markdown-body code {
+            @apply bg-slate-100 text-pink-600 px-1.5 py-0.5 rounded text-sm font-mono;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-brand-start to-brand-end text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-4 py-4 md:py-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-white/20 p-2.5 rounded-full backdrop-blur-sm">
+                    <i class="fa-solid fa-bicycle text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-bold tracking-wide">轉角遇到 U Bike</h1>
+                    <p class="text-white/80 text-sm">使用者說明手冊與技術架構</p>
+                </div>
+            </div>
+            
+            <!-- Quick Links -->
+            <div class="flex gap-3">
+                <a href="https://begin0808.github.io/ubike/" target="_blank" class="bg-white text-brand-end hover:bg-slate-50 px-4 py-2 rounded-full font-bold shadow-md transition-transform hover:scale-105 flex items-center gap-2 text-sm">
+                    <i class="fa-solid fa-play"></i> 執行程式
+                </a>
+                <a href="https://github.com/begin0808/ubike" target="_blank" class="bg-slate-800 text-white hover:bg-slate-700 px-4 py-2 rounded-full font-bold shadow-md transition-transform hover:scale-105 flex items-center gap-2 text-sm border border-slate-600">
+                    <i class="fa-brands fa-github"></i> GitHub
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-4 py-8">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-10 markdown-body">
+            
+            <p class="text-lg">歡迎使用 <strong>轉角遇到 U Bike</strong>！這是一個專為尋找 YouBike 2.0 站點設計的網頁應用程式，結合了即時地圖、自動定位與清楚的列表顯示。</p>
+            <p>此專案採用「前後端分離」與「中繼代理 (Proxy)」架構，讓任何人都能安全地使用自己的 TDX API 密鑰來查詢即時車輛資訊。</p>
+
+            <h2><i class="fa-solid fa-rocket mr-3 text-brand-start"></i>快速入門：網頁端功能操作</h2>
+            <ol class="list-decimal marker:font-bold marker:text-brand-start">
+                <li><strong>📍 自動定位</strong>：<br>開啟網頁時，系統會自動詢問 GPS 權限，請選擇「允許」。定位成功後，地圖會自動縮放到您目前的位置，並顯示附近的 YouBike 站點。</li>
+                <li><strong>🚴 站點資訊</strong>：
+                    <ul class="list-disc mt-2">
+                        <li>地圖上的 <strong>數字圓圈</strong> 代表該站點目前的「可借車輛數」。</li>
+                        <li>下方 (手機板) 或 右側 (電腦版) 的列表會列出最近的 10 個站點。</li>
+                        <li>每個卡片會顯示：距離、可借數量、電輔車/一般車數量，以及 <strong>資料更新時間</strong>。</li>
+                    </ul>
+                </li>
+                <li><strong>🔄 自動更新與跟隨</strong>：
+                    <ul class="list-disc mt-2">
+                        <li>系統每 <strong>60 秒</strong> 會自動重新抓取最新資料。</li>
+                        <li>如果在自動更新時，您沒有正在操作地圖（搜尋其他區域），地圖會 <strong>自動飛回</strong> 您的最新 GPS 位置，確保導航不迷路。</li>
+                    </ul>
+                </li>
+                <li><strong>🔍 搜尋此區域</strong>：<br>如果您手動拖曳地圖查看別處，畫面上方會出現「搜尋此區域」按鈕。點擊後，系統會鎖定該區域進行搜尋，<strong>暫時停止</strong>自動跟隨 GPS 的功能，方便您查詢異地站點。</li>
+            </ol>
+
+            <h2><i class="fa-solid fa-gears mr-3 text-brand-start"></i>系統架構與 API 密鑰說明</h2>
+            <p>為了確保系統的穩定性與安全性，本程式需要您輸入從「交通部運輸資料流通服務 (TDX)」申請的 API 密鑰。</p>
+
+            <h3>📝 如何申請 TDX API 密鑰？</h3>
+            <p>申請過程完全免費，只需幾個簡單的步驟：</p>
+            <ol class="list-decimal marker:text-slate-400">
+                <li><strong>前往 TDX 官網</strong>：打開 <a href="https://tdx.transportdata.tw/" target="_blank">交通部運輸資料流通服務 (TDX) 網站</a>。</li>
+                <li><strong>註冊/登入會員</strong>：點擊右上角的「登入/註冊」，可以使用 Google 等第三方帳號快速登入。</li>
+                <li><strong>進入會員中心</strong>：登入後，點擊右上角您的帳號名稱，選擇「會員中心」。</li>
+                <li><strong>建立金鑰</strong>：在左側選單選擇「資料服務」 -> 「API 金鑰」，然後點擊「新增應用程式」。</li>
+                <li><strong>取得密鑰</strong>：隨意填寫應用程式名稱與說明後送出。接著您就會在畫面上看到專屬於您的 <code>Client ID</code> 與 <code>Client Secret</code>。將這兩串字元複製起來，填入本網頁的設定視窗即可！</li>
+            </ol>
+
+            <h3>🔑 金鑰存在哪裡？</h3>
+            <p>使用者輸入的 <strong>Client ID</strong> 和 <strong>Client Secret</strong>，是透過 JavaScript 的 <code>localStorage</code> 技術儲存在<strong>使用者自己的電腦/手機的瀏覽器中</strong>。這意味著：</p>
+            <ul class="list-disc marker:text-slate-400">
+                <li>這些資訊<strong>不會</strong>上傳或儲存到開發者的伺服器，也不會保存在 Google 的資料庫裡。</li>
+                <li>下次使用者用<strong>同一台裝置、同一個瀏覽器</strong>打開這個網頁時，瀏覽器會自動把金鑰填回去，不用重新輸入。</li>
+                <li>如果清除瀏覽器快取，或者換一台手機/電腦，就需要重新輸入。</li>
+            </ul>
+
+            <h3>🛡️ GAS 的角色是什麼？</h3>
+            <p>系統後端使用 Google Apps Script (GAS) 扮演一個<strong>「中繼代理伺服器 (Proxy)」</strong>的角色。它的運作流程非常單純：</p>
+            <ol class="list-decimal marker:text-slate-400">
+                <li><strong>接收</strong>：前端網頁把「使用者的金鑰」和「座標」打包，透過安全的 POST 請求傳給 GAS。</li>
+                <li><strong>溝通</strong>：GAS 拿著這組金鑰，轉身去向 TDX 敲門要 Token。拿到 Token 後，再向 TDX 請求附近的 UBIKE 站點和車輛資料。</li>
+                <li><strong>回傳</strong>：GAS 把 TDX 給的龐大資料整理乾淨後，原封不動地傳回給前端網頁顯示。</li>
+            </ol>
+
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 mt-6">
+                <h3 class="!mt-0 text-slate-800 flex items-center gap-2"><i class="fa-solid fa-code text-slate-500"></i> 進階：自己部署專屬的 GAS 代理伺服器</h3>
+                <p class="text-sm">上傳至 GitHub 的原始碼中包含了 <code>GAS.txt</code> 檔案。如果您有資安疑慮，或是想將此系統整合到您自己的專案中，您完全可以拿著這份程式碼，去 Google Apps Script 建立並部署一台屬於您自己的中繼站！</p>
+                <p class="text-sm italic text-slate-500 mb-3">(請放心，上傳 <code>GAS.txt</code> 非常安全，因為裡面<strong>完全沒有</strong>包含任何私人的 API 金鑰，純粹只有代理運作的邏輯程式碼。)</p>
+                <p class="font-bold text-sm mb-2">簡單部署步驟：</p>
+                <ol class="list-decimal pl-5 text-sm space-y-1 marker:text-slate-400">
+                    <li>開啟 <a href="https://script.google.com/home" target="_blank">Google Apps Script</a> 建立「新專案」。</li>
+                    <li>將 <code>GAS.txt</code> 裡的所有程式碼複製，貼到您的專案中並存檔。</li>
+                    <li>點擊右上角的「部署」 -> 「新增部署作業」，選擇「網頁應用程式」。</li>
+                    <li>將「執行身分」設為「我」，「誰可以存取」設為「所有人」，然後點擊部署。</li>
+                    <li>將取得的<strong>全新網址</strong>，替換掉前端 <code>index.html</code> 約第 305 行的 <code>GAS_API_URL</code> 變數即可！</li>
+                </ol>
+            </div>
+
+            <h2><i class="fa-regular fa-circle-question mr-3 text-brand-start"></i>常見問題與安全須知 (Q&A)</h2>
+            
+            <div class="space-y-4">
+                <div class="bg-orange-50/50 p-4 rounded-lg border border-orange-100">
+                    <p class="font-bold text-slate-800 mb-1">Q1：在網頁上輸入我的 API 密鑰安全嗎？</p>
+                    <p class="text-slate-600 mb-0"><strong>A：</strong> 是的，相對安全。您的密鑰是存放在自己的裝置上，且傳輸過程經過 HTTPS 加密。但<strong>請注意</strong>：強烈建議 <strong>不要在公共電腦（如網咖、圖書館）或借用他人的手機時輸入密鑰</strong>。如果不小心輸入了，請務必在離開前點擊設定視窗中的「清除紀錄」按鈕。</p>
+                </div>
+
+                <div class="p-4 rounded-lg border border-slate-100">
+                    <p class="font-bold text-slate-800 mb-1">Q2：資料會延遲嗎？</p>
+                    <p class="text-slate-600 mb-0"><strong>A：</strong> 本系統資料來源為 TDX API，與 YouBike 官方系統同步。但官方資料傳輸可能會有 1~3 分鐘的天然延遲，建議參考卡片上的「更新時間」。</p>
+                </div>
+
+                <div class="p-4 rounded-lg border border-slate-100">
+                    <p class="font-bold text-slate-800 mb-1">Q3：如果別人用了這個網頁，會扣到我的 TDX API 額度嗎？</p>
+                    <p class="text-slate-600 mb-0"><strong>A：</strong> 不會。每個人都需要輸入<strong>自己申請的</strong> API 密鑰。這代表大家都是用自己的額度在查詢資料，您的額度完全不會被其他人消耗。</p>
+                </div>
+            </div>
+
+            <div class="mt-10 text-center text-slate-500 pb-4">
+                <i class="fa-solid fa-leaf text-green-500 mb-2 text-xl"></i>
+                <p>祝您騎乘愉快！</p>
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>
