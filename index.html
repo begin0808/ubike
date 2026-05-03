@@ -228,7 +228,7 @@
             <div
                 class="bg-black/20 text-white px-2 py-0.5 rounded-full text-[10px] md:text-xs font-mono backdrop-blur-sm border border-white/10 flex items-center">
                 <i class="fa-regular fa-clock mr-1 opacity-70"></i>
-                <span id="countdown">300</span>s
+                <span id="countdown">180</span>s
             </div>
 
             <!-- 手動定位按鈕 -->
@@ -388,7 +388,7 @@
 
         let refreshTimer = null;
         let countdownTimer = null;
-        let secondsLeft = 300; // 改為 300 秒 (5分鐘)
+        let secondsLeft = 180; // 改為 180 秒 (3分鐘)
         let watchId = null;
 
         // 從 localStorage 讀取 API 密鑰
@@ -886,7 +886,7 @@
             if (refreshTimer) clearInterval(refreshTimer);
             if (countdownTimer) clearInterval(countdownTimer);
 
-            // 每 300 秒抓一次
+            // 每 180 秒抓一次
             refreshTimer = setInterval(() => {
                 // ★ 時間到，如果不是手動搜尋異地，就自動飛回目前 GPS 位置
                 if (!isRemoteMode && userLat && userLng) {
@@ -895,18 +895,18 @@
                 } else {
                     fetchNearbyData();
                 }
-            }, 300000);
+            }, 180000);
             resetCountdown();
             countdownTimer = setInterval(() => {
                 secondsLeft--;
-                if (secondsLeft < 0) secondsLeft = 300;
+                if (secondsLeft < 0) secondsLeft = 180;
                 document.getElementById('countdown').innerText = secondsLeft;
             }, 1000);
         }
 
         function resetCountdown() {
-            secondsLeft = 300; // 配合設定
-            document.getElementById('countdown').innerText = "300";
+            secondsLeft = 180; // 配合設定
+            document.getElementById('countdown').innerText = "180";
         }
 
         function manualRefresh() {
