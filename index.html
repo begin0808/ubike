@@ -282,7 +282,7 @@
                     </span>
                     <span
                         class="text-[10px] md:text-xs font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
-                        範圍 2 km
+                        範圍 1 km
                     </span>
                 </h2>
             </div>
@@ -701,8 +701,7 @@
                     });
 
                     const availableStations = allStations
-                        .sort((a, b) => a.distance - b.distance)
-                        .filter(s => s.available > 0);
+                        .sort((a, b) => a.distance - b.distance);
 
                     const top20 = availableStations.slice(0, 20);
 
@@ -743,7 +742,7 @@
             stationMarkers = [];
 
             stations.forEach((s, index) => {
-                const color = markerColors[index % markerColors.length];
+                const color = s.available === 0 ? '#94A3B8' : markerColors[index % markerColors.length];
                 const labelContent = s.available;
 
                 const icon = L.divIcon({
@@ -804,7 +803,7 @@
             }
 
             stations.forEach((s, index) => {
-                const color = markerColors[index % markerColors.length];
+                const color = s.available === 0 ? '#94A3B8' : markerColors[index % markerColors.length];
                 const num = index + 1;
                 const cleanName = s.name.replace(/YouBike2\.0_/g, '');
                 const delay = index * 0.05;

@@ -24,8 +24,8 @@ function doPost(e) {
        throw new Error("Missing 'lat' or 'lng' parameters.");
     }
 
-    // 呼叫主函式 (搜尋半徑 2000m)
-    const data = getYouBikeDataNearBy(lat, lng, 2000, clientId, clientSecret);
+    // 呼叫主函式 (搜尋半徑 1000m - 注意 TDX API 限制最大只能 1000m)
+    const data = getYouBikeDataNearBy(lat, lng, 1000, clientId, clientSecret);
     
     return ContentService.createTextOutput(JSON.stringify(data))
       .setMimeType(ContentService.MimeType.JSON);
