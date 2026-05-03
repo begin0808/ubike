@@ -94,12 +94,14 @@ function getYouBikeDataNearBy(lat, lng, radius, clientId, clientSecret) {
       return {
         uid: station.StationUID,
         name: station.StationName.Zh_tw,
+        address: station.StationAddress ? station.StationAddress.Zh_tw : '',
         lat: station.StationPosition.PositionLat,
         lng: station.StationPosition.PositionLon,
         total: totalSpaces,
         available: avail ? avail.AvailableRentBikes : 0,
         available_general: generalBikes,
         available_electric: electricBikes,
+        empty: avail ? avail.AvailableReturnBikes : 0,
         updateTime: avail ? avail.UpdateTime : ''
       };
     });
