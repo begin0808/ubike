@@ -180,6 +180,18 @@
             }
         }
 
+        /* Leaflet Popup 客製化 */
+        .custom-popup .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(243, 244, 246, 1);
+        }
+
+        .custom-popup .leaflet-popup-content {
+            margin: 12px;
+            line-height: 1.4;
+        }
+
         /* Mobile / Desktop Layout is now handled by Tailwind utility classes in HTML */
     </style>
 </head>
@@ -248,7 +260,7 @@
 
             <!-- Error Toast: 懸浮在地圖上層 -->
             <div id="error-msg"
-                class="hidden absolute top-6 left-1/2 transform -translate-x-1/2 w-[90%] max-w-md md:w-auto z-[2000] bg-red-500 text-white px-4 md:px-5 py-3 rounded-2xl shadow-2xl flex flex-col items-center justify-center animate-bounce transition-all">
+                class="hidden absolute top-6 left-0 right-0 mx-auto w-[90%] max-w-md md:w-fit z-[2000] bg-red-500 text-white px-4 md:px-5 py-3 rounded-2xl shadow-2xl flex flex-col items-center justify-center animate-bounce transition-all">
                 <div class="flex flex-col md:flex-row items-center gap-2 mb-2 text-center">
                     <i class="fa-solid fa-circle-exclamation text-lg"></i>
                     <span id="error-text" class="font-bold text-sm md:text-base break-words"></span>
@@ -713,6 +725,19 @@
             }
         }
 
+        function highlightCard(uid) {
+            document.querySelectorAll('.station-card').forEach(card => {
+                card.classList.remove('bg-orange-50', 'border-orange-400', 'shadow-md');
+                card.classList.add('bg-white', 'border-slate-100');
+            });
+            const targetCard = document.getElementById(`card-${uid}`);
+            if (targetCard) {
+                targetCard.classList.remove('bg-white', 'border-slate-100');
+                targetCard.classList.add('bg-orange-50', 'border-orange-400', 'shadow-md');
+                targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
         function renderMap(stations) {
             stationMarkers.forEach(m => map.removeLayer(m));
             stationMarkers = [];
@@ -731,7 +756,36 @@
                 const marker = L.marker([s.lat, s.lng], { icon: icon, zIndexOffset: 1000 - index })
                     .addTo(map);
 
-                marker.on('click', () => { map.flyTo([s.lat, s.lng], 16.5); });
+                // 準備 Popup 內容
+                const emptySpaces = s.empty !== undefined ? s.empty : Math.max(0, s.total - s.available);
+                const cleanName = s.name.replace(/YouBike2\.0_/g, '');
+                const updateTimeStr = s.updateTime ? s.updateTime.replace('T', ' ').substring(0, 19) : formatTime(s.updateTime);
+                const addressHtml = s.address ? `<div class="text-xs text-slate-500 mb-2 font-medium">站點位置：${s.address}</div>` : '';
+
+                const popupHtml = `
+                    <div class="min-w-[180px] p-1 font-sans">
+                        <div class="font-bold text-slate-800 text-[14px] mb-1 tracking-wide">租賃站點查詢：${cleanName}</div>
+                        ${addressHtml}
+                        <div class="text-xs font-bold text-slate-700 mb-1 border-t border-slate-200 pt-2">可借車輛：</div>
+                        <div class="text-xs text-slate-600 flex items-center ml-1 mb-0.5">
+                            <i class="fa-solid fa-bicycle w-4 text-green-600"></i> YouBike 2.0：<span class="font-bold text-slate-800 ml-1">${s.available_general}</span>
+                        </div>
+                        <div class="text-xs text-slate-600 flex items-center ml-1 mb-2">
+                            <i class="fa-solid fa-bolt w-4 text-yellow-500"></i> YouBike 2.0E：<span class="font-bold text-slate-800 ml-1">${s.available_electric}</span>
+                        </div>
+                        <div class="text-xs font-bold text-slate-700 mt-2 bg-slate-50 p-1.5 rounded-lg inline-block w-full">
+                            可停空位：<span class="text-blue-600 text-[14px] ml-1">${emptySpaces}</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 mt-2 text-right">時間：${updateTimeStr}</div>
+                    </div>
+                `;
+                marker.bindPopup(popupHtml, { className: 'custom-popup' });
+
+                marker.on('click', () => { 
+                    map.flyTo([s.lat, s.lng], 16.5); 
+                    highlightCard(s.uid);
+                    marker.openPopup();
+                });
                 stationMarkers.push(marker);
             });
         }
@@ -754,10 +808,11 @@
                 const num = index + 1;
                 const cleanName = s.name.replace(/YouBike2\.0_/g, '');
                 const delay = index * 0.05;
+                const emptySpaces = s.empty !== undefined ? s.empty : Math.max(0, s.total - s.available);
 
                 const item = document.createElement('div');
-                // 極致壓縮: p-2.5
-                item.className = "station-card flex items-center p-2.5 md:p-4 cursor-pointer animate-entry bg-white rounded-xl shadow-sm border border-slate-100";
+                item.id = `card-${s.uid}`;
+                item.className = "station-card flex items-center p-2.5 md:p-4 cursor-pointer animate-entry bg-white rounded-xl shadow-sm border border-slate-100 transition-colors duration-300";
                 item.style.animationDelay = `${delay}s`;
 
                 item.innerHTML = `
@@ -783,6 +838,9 @@
                                 <span class="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-100 flex items-center">
                                     <i class="fa-solid fa-bicycle mr-1 text-[9px]"></i>${s.available_general}
                                 </span>
+                                <span class="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 flex items-center">
+                                    <i class="fa-solid fa-square-parking mr-1 text-[9px]"></i>${emptySpaces}
+                                </span>
                             </div>
                             <div class="text-[10px] text-slate-400 font-normal ml-auto">
                                 更新於 ${formatTime(s.updateTime)}
@@ -802,6 +860,12 @@
 
                 item.onclick = () => {
                     map.flyTo([s.lat, s.lng], 17);
+                    highlightCard(s.uid);
+                    // 尋找對應的 marker 並打開 popup
+                    const marker = stationMarkers[index];
+                    if (marker) {
+                        marker.openPopup();
+                    }
                 };
 
                 container.appendChild(item);
