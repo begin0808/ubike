@@ -24,8 +24,8 @@ function doPost(e) {
        throw new Error("Missing 'lat' or 'lng' parameters.");
     }
 
-    // 呼叫主函式 (搜尋半徑 1000m)
-    const data = getYouBikeDataNearBy(lat, lng, 1000, clientId, clientSecret);
+    // 呼叫主函式 (搜尋半徑 2000m)
+    const data = getYouBikeDataNearBy(lat, lng, 2000, clientId, clientSecret);
     
     return ContentService.createTextOutput(JSON.stringify(data))
       .setMimeType(ContentService.MimeType.JSON);
@@ -53,11 +53,11 @@ function getYouBikeDataNearBy(lat, lng, radius, clientId, clientSecret) {
   const token = getAccessToken(clientId, clientSecret);
   
   // 1. 取得附近站點靜態資料 (位置、名稱)
-  const stationUrl = `https://tdx.transportdata.tw/api/advanced/v2/Bike/Station/NearBy?%24top=30&%24spatialFilter=nearby(${lat},${lng},${radius})&%24format=JSON`;
+  const stationUrl = `https://tdx.transportdata.tw/api/advanced/v2/Bike/Station/NearBy?%24top=50&%24spatialFilter=nearby(${lat},${lng},${radius})&%24format=JSON`;
   const stationData = fetchTdxData(stationUrl, token);
   
   // 2. 取得附近即時車位資料
-  const availUrl = `https://tdx.transportdata.tw/api/advanced/v2/Bike/Availability/NearBy?%24top=30&%24spatialFilter=nearby(${lat},${lng},${radius})&%24format=JSON`;
+  const availUrl = `https://tdx.transportdata.tw/api/advanced/v2/Bike/Availability/NearBy?%24top=50&%24spatialFilter=nearby(${lat},${lng},${radius})&%24format=JSON`;
   const availData = fetchTdxData(availUrl, token);
   
   // 3. 建立即時資料的索引 (Map)
